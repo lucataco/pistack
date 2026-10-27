@@ -15,7 +15,7 @@ jobs:
   drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compare the pin with upstream main
         run: |
           pinned=$(node -p "require('./upstream.lock.json').commit")
