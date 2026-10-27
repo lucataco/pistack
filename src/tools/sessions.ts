@@ -1,7 +1,7 @@
 // `pistack_sessions`: the counterpart of Cursor's `agent-transcripts/`, scoped to this workspace.
 // pi sessions are trees, so a transcript is the active branch walked from its leaf, not file order.
 
-import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -106,20 +106,14 @@ export function renderTranscript(entries: readonly Entry[], options: { limit: nu
   return text;
 }
 
-function allowedToRead(file: string, ctx: ExtensionContext): boolean {
-  let real: string;
-  try {
-    real = realpathSync(file);
-  } catch {
-    return false;
-  }
-  if (!real.endsWith(".jsonl")) return false;
-  const header = readHeader(real);
+/** Only session files of this workspace or of its subagents. `isInside` compares real paths, so symlinks cannot escape. */
+export function allowedToRead(file: string, ctx: ExtensionContext): boolean {
+  if (!file.endsWith(".jsonl") || !existsSync(file)) return false;
+  const header = readHeader(file);
   if (!header || typeof header.cwd !== "string") return false;
   const workspace = gitRoot(ctx.cwd) ?? ctx.cwd;
-  const inWorkspaceDir = isInside(real, realpathSync(workspaceSessionDir(ctx)));
-  const inAgentDir = existsSync(join(configDir(), "agents")) && isInside(real, realpathSync(join(configDir(), "agents")));
-  return (inWorkspaceDir || inAgentDir) && (isInside(header.cwd, workspace) || isInside(header.cwd, ctx.cwd));
+  const inSessionDirs = isInside(file, workspaceSessionDir(ctx)) || isInside(file, join(configDir(), "agents"));
+  return inSessionDirs && (isInside(header.cwd, workspace) || isInside(header.cwd, ctx.cwd));
 }
 
 export function registerSessionsTool(pi: ExtensionAPI, manager: AgentManager): void {

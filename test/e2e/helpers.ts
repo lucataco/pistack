@@ -56,8 +56,12 @@ export function cleanEnv(agentDir: string, extra: Record<string, string> = {}): 
   return { ...env, PI_CODING_AGENT_DIR: agentDir, ...extra };
 }
 
-export function runPi(box: Sandbox, args: string[], options: { env?: Record<string, string>; timeoutMs?: number } = {}): Promise<PiRun> {
-  const argv = [PI_CLI, "--mode", "json", "-p", "--offline", "-e", ROOT, "-e", FIXTURE, "--model", "pistack-faux/fixture", ...args];
+export function runPi(
+  box: Sandbox,
+  args: string[],
+  options: { env?: Record<string, string>; timeoutMs?: number; /** Where pi loads pistack from. Default: the repo. */ extension?: string } = {},
+): Promise<PiRun> {
+  const argv = [PI_CLI, "--mode", "json", "-p", "--offline", "-e", options.extension ?? ROOT, "-e", FIXTURE, "--model", "pistack-faux/fixture", ...args];
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, argv, { cwd: box.cwd, env: cleanEnv(box.agentDir, options.env), stdio: ["ignore", "pipe", "pipe"] });
     const events: Record<string, any>[] = [];

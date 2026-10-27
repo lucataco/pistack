@@ -1,10 +1,10 @@
 // End-to-end: real pi 1.4 processes, real subagent processes, the faux provider. No tokens, no network.
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { git, runPi, sandbox, sessionEntries, type Sandbox } from "./helpers.ts";
+import { ROOT, git, runPi, sandbox, sessionEntries, type Sandbox } from "./helpers.ts";
 
 const PISTACK_TOOLS = ["pistack_agent", "pistack_agents", "pistack_ask", "pistack_loop", "pistack_sessions", "pistack_todo"];
 
@@ -37,6 +37,17 @@ describe("pistack e2e", { concurrency: false }, () => {
     const state = stateReply(run.final);
     assert.match(state.pistackSection ?? "", /Pi adapter: `.*pstack\/docs\/harness\/pi\.md`/);
     assert.equal(state.potetoSection, null, "a one-off skill run is not sticky mode");
+    for (const tool of PISTACK_TOOLS) assert.ok(state.tools.includes(tool), `${tool} should be active`);
+  });
+
+  it("engages when pistack is reached through a symlink (macOS /tmp, symlinked dotfiles)", async () => {
+    box = sandbox();
+    const linked = join(box.root, "linked-pistack");
+    symlinkSync(ROOT, linked, "dir");
+    const run = await runPi(box, ["--", "/skill:poteto-mode E2E_STATE"], { extension: linked });
+    assert.equal(run.code, 0, run.stderr);
+    const state = stateReply(run.final);
+    assert.ok(state.pistackSection, "the skill path through the symlink counts as a pistack skill");
     for (const tool of PISTACK_TOOLS) assert.ok(state.tools.includes(tool), `${tool} should be active`);
   });
 
@@ -167,5 +178,25 @@ describe("pistack e2e", { concurrency: false }, () => {
     assert.match(sessions.final, /Current session: .*\.jsonl/);
     const todos = await runPi(box, ["--poteto", "--", "E2E_TODO"]);
     assert.match(todos.final, /0\/2 completed\n\[~\] 1\. first\n\[ \] 2\. second/);
+  });
+
+  it("reads this workspace's transcripts and refuses other workspaces'", async () => {
+    box = sandbox();
+    const read = await runPi(box, ["--poteto", "--", "E2E_SESSIONS_READ"]);
+    assert.equal(read.code, 0, read.stderr);
+    assert.match(read.final, /^AFTER_pistack_sessions depth=0: Session .*\.jsonl \(cwd .*\)\n\n(\[model → pistack-faux\/fixture\]\n\n)?\[user\] E2E_SESSIONS_READ\n\n\[tool call\] pistack_sessions/);
+
+    // A session of another workspace in the same agent dir is off limits.
+    const other = sandbox();
+    try {
+      const foreign = await runPi({ ...other, agentDir: box.agentDir }, ["--", "hello from elsewhere"]);
+      assert.equal(foreign.code, 0, foreign.stderr);
+      const file = sessionEntries(box).find((entry) => entry.type === "session" && entry.cwd?.endsWith(join(other.root.split("/").pop()!, "work")))?.__file;
+      assert.ok(file, "the other workspace's session exists");
+      const refused = await runPi(box, ["--poteto", "--", "E2E_SESSIONS_OUTSIDE"], { env: { E2E_OUTSIDE_FILE: file } });
+      assert.match(refused.final, /AFTER_pistack_sessions depth=0: .*is not a session of this workspace/);
+    } finally {
+      other.cleanup();
+    }
   });
 });

@@ -89,6 +89,8 @@ function reply(messages: readonly Message[]): AssistantMessage {
   if (text.includes("E2E_LOOP")) return call("pistack_loop", { action: "start", until: "test -f loop.flag", max_iterations: 3 });
   if (text.includes("E2E_CITATION")) return fauxAssistantMessage("Root cause found. This follows principle-fix-root-causes.");
   if (text.includes("E2E_ASK")) return call("pistack_ask", { questions: [{ id: "q", prompt: "Pick one", options: [{ id: "a", label: "A" }] }] });
+  if (text.includes("E2E_SESSIONS_READ")) return call("pistack_sessions", { action: "read" });
+  if (text.includes("E2E_SESSIONS_OUTSIDE")) return call("pistack_sessions", { action: "read", file: process.env.E2E_OUTSIDE_FILE ?? "/nonexistent.jsonl" });
   if (text.includes("E2E_SESSIONS")) return call("pistack_sessions", { action: "current" });
   if (text.includes("E2E_TODO")) {
     return call("pistack_todo", { todos: [{ id: "1", content: "first", status: "in_progress" }, { id: "2", content: "second" }] });

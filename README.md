@@ -5,8 +5,17 @@
 pistack ships all 58 pstack skills unchanged and adds the runtime pieces Cursor provides and pi doesn't: subagents, worktree isolation, per-role models, questions, todos, transcripts, and bounded loops.
 
 ```bash
-pi install git:git@github.com:lucataco/pistack   # SSH, for the private repo
+pi install git:git@github.com:lucataco/pistack
 ```
+
+There's no npm package. pi clones the repo over SSH (so your GitHub SSH key covers the private repo), loads it in place, and has nothing to `npm install`.
+
+| To | Run |
+| --- | --- |
+| Try it for one session without installing | `pi -e git:git@github.com:lucataco/pistack` |
+| Update to the latest `main` | `pi update git:git@github.com:lucataco/pistack` (or `pi update --extensions` for all packages) |
+| Pin a release | `pi install git:git@github.com:lucataco/pistack@v0.2.0` |
+| Remove it | `pi remove git:git@github.com:lucataco/pistack` |
 
 Then, in pi:
 

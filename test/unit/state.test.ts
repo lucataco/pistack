@@ -1,11 +1,29 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { PSTACK_DIR, SKILLS_DIR, principleSlugs } from "../../src/paths.ts";
+import { PSTACK_DIR, SKILLS_DIR, isInside, principleSlugs, realPath } from "../../src/paths.ts";
 import { pistackSection, potetoSection } from "../../src/prompt.ts";
 import { citedPrinciples, expandedSkills, initialState, isPistackPath, pathsInCommand, playbookFromPath, principleFromPath } from "../../src/state.ts";
 import { activeBranch, renderEntry } from "../../src/tools/sessions.ts";
 import { applyTodos, formatTodos } from "../../src/tools/todo.ts";
+
+describe("paths", () => {
+  it("compares real paths through symlinks, also for files that do not exist", () => {
+    const root = mkdtempSync(join(tmpdir(), "pistack-paths-"));
+    try {
+      mkdirSync(join(root, "real", "pkg", "skills"), { recursive: true });
+      symlinkSync(join(root, "real"), join(root, "link"), "dir");
+      assert.ok(isInside(join(root, "link", "pkg", "skills", "missing", "SKILL.md"), join(root, "real", "pkg")));
+      assert.ok(isInside(join(root, "real", "pkg", "skills"), join(root, "link", "pkg")));
+      assert.ok(!isInside(join(root, "real", "pkg-other"), join(root, "link", "pkg")), "a shared prefix is not containment");
+      assert.equal(realPath(join(root, "link", "nope", "a.md")), join(realpathSync(root), "real", "nope", "a.md"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("session state helpers", () => {
   it("reads skills pi expanded into a prompt", () => {

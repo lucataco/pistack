@@ -1,5 +1,5 @@
-import { existsSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
@@ -54,8 +54,30 @@ export function principleSlugs(): string[] {
   return principleCache;
 }
 
+/**
+ * The real path of `path` with symlinks resolved in every existing ancestor, so it works for paths
+ * that do not exist yet. Node gives modules their real path while pi reports skills by the path it
+ * found them at, and the two differ under a symlink (macOS /tmp, a symlinked ~/.pi).
+ */
+export function realPath(path: string): string {
+  const absolute = resolve(path);
+  const missing: string[] = [];
+  let current = absolute;
+  for (;;) {
+    try {
+      return join(realpathSync(current), ...missing);
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return absolute;
+      missing.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
+
+/** Whether `child` is `parent` or inside it, comparing real paths. */
 export function isInside(child: string, parent: string): boolean {
-  const a = resolve(child);
-  const b = resolve(parent);
-  return a === b || a.startsWith(b.endsWith("/") ? b : `${b}/`);
+  const a = realPath(child);
+  const b = realPath(parent);
+  return a === b || a.startsWith(b.endsWith(sep) ? b : `${b}${sep}`);
 }
