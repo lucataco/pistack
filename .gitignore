@@ -1,0 +1,6 @@
+node_modules/
+.upstream/
+.test-tmp/
+.pi/worktrees/
+*.log
+.DS_Store

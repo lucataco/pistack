@@ -1,0 +1,38 @@
+name: upstream
+
+# Weekly: report when cursor/plugins has pstack changes past the pinned commit.
+# Bumping stays a reviewed change: node scripts/vendor.mjs --commit <sha> && npm run generate.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare the pin with upstream main
+        run: |
+          pinned=$(node -p "require('./upstream.lock.json').commit")
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/cursor/plugins.git /tmp/plugins
+          cd /tmp/plugins
+          latest=$(git rev-parse origin/HEAD)
+          count=$(git rev-list --count "$pinned..$latest" -- pstack cursor-team-kit/skills/deslop cursor-team-kit/skills/control-ui cursor-team-kit/skills/control-cli)
+          version=$(git show "$latest:pstack/.cursor-plugin/plugin.json" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).version))")
+          {
+            echo "### pstack upstream"
+            echo "Pinned: \`${pinned:0:12}\`. Upstream main: \`${latest:0:12}\` (pstack $version)."
+            echo "Commits touching vendored paths since the pin: **$count**."
+            if [ "$count" -gt 0 ]; then
+              echo ""
+              echo "To update: \`node scripts/vendor.mjs --commit $latest && npm run generate && npm run check\`"
+              echo ""
+              git log --oneline "$pinned..$latest" -- pstack | head -40 | sed 's/^/- /'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$count" -gt 0 ]; then echo "::warning::pstack has $count upstream commits past the pin"; fi
